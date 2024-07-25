@@ -422,7 +422,7 @@ class BoostBranch(nn.Module):
         return out
     
 
-class EBTNet(nn.Module):
+class EBTNet_(nn.Module):
     '''
     description: 
     param {*} self
@@ -498,8 +498,8 @@ class EBTNet(nn.Module):
             return {'pred':out,'boost':boostOut}
         else:
             return out#
-def CUSNet(inChannels,outChannels,headApply=[True,True,True,True]):
-    model = EBTNet(inChannel=inChannels,classes=outChannels,headApply=headApply)
+def EBTNet(inChannels,outChannels,headApply=[True,True,True,True]):
+    model = EBTNet_(inChannel=inChannels,classes=outChannels,headApply=headApply)
     # model.boostBranch = nn.Identity()
     return model
 if __name__ == '__main__':

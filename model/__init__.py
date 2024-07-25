@@ -1,3 +1,3 @@
 
 
-from .cusnet import CUSNet
+from .cusnet import EBTNet

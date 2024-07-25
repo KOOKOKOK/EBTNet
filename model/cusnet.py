@@ -7,7 +7,7 @@ from torch.nn import functional as F
 from torchvision.ops.misc import Conv2dNormActivation
 from torch import Tensor
 
-class CusPartialBlock(nn.Module):
+class GSPB(nn.Module):
     def __init__(self, inChannels,outChannels,dilations=(1, 6, 12, 18)) -> None:
         super().__init__()
 
@@ -58,7 +58,7 @@ class DetailBranchBlock(nn.Module):
                     nn.Conv2d(in_channels=inChannels,out_channels=outChannels,kernel_size=3,stride=2,padding=1),
                     nn.BatchNorm2d(outChannels),
                     nn.GELU(),
-                    *[CusPartialBlock(outChannels,outChannels) for i in range(repeat)]
+                    *[GSPB(outChannels,outChannels) for i in range(repeat)]
         )
        
     def forward(self,x):
@@ -112,7 +112,7 @@ class StemBlock(nn.Module):
 
 
 
-class CusBlock(nn.Module):
+class EDSConv(nn.Module):
     expansion = 4
     def __init__(self, inChannels,outChannel,groups=1) -> None:
         super().__init__()
@@ -158,7 +158,7 @@ class DepthwiseConv2d(nn.Module):
         x = self.depthwise(x)
         x = self.pointwise(x)
         return x
-class GatherExpandBlock(nn.Module):
+class LHPB(nn.Module):
     '''
     description:
     param {*} self
@@ -175,17 +175,17 @@ class GatherExpandBlock(nn.Module):
         if self.downOp:
             self.conv = nn.Sequential(
                 Conv2dNormActivation(in_channels=inChannel,out_channels=outChannel,kernel_size=3,stride=2,padding=1,norm_layer=nn.BatchNorm2d,activation_layer=nn.GELU,inplace=None),\
-                CusBlock(inChannels=outChannel,outChannel=hidenChannel),\
+                EDSConv(inChannels=outChannel,outChannel=hidenChannel),\
                 # DepthwiseConv2d(in_channels=outChannel,out_channels=hidenChannel,kernel_size=3,stride=2,padding=1),
                 nn.BatchNorm2d(hidenChannel),\
-                CusBlock(inChannels=outChannel,outChannel=hidenChannel),\
+                EDSConv(inChannels=outChannel,outChannel=hidenChannel),\
                 # DepthwiseConv2d(in_channels=hidenChannel,out_channels=hidenChannel,kernel_size=3,padding=1),
                 nn.BatchNorm2d(hidenChannel),\
                 nn.Conv2d(in_channels=hidenChannel,out_channels=outChannel,kernel_size=1,stride=1),\
                 nn.BatchNorm2d(outChannel),\
             )
             self.branch = nn.Sequential(
-                CusBlock(inChannels=inChannel,outChannel=hidenChannel),\
+                EDSConv(inChannels=inChannel,outChannel=hidenChannel),\
                 # DepthwiseConv2d(in_channels=inChannel,out_channels=outChannel,kernel_size=3,stride=2,padding=1),
                 nn.BatchNorm2d(outChannel),\
                 nn.Conv2d(in_channels=outChannel,out_channels=outChannel,kernel_size=1,stride=1),\
@@ -194,7 +194,7 @@ class GatherExpandBlock(nn.Module):
         else:
             self.conv = nn.Sequential(
                 Conv2dNormActivation(in_channels=inChannel,out_channels=outChannel,kernel_size=3,stride=1,padding=1,norm_layer=nn.BatchNorm2d,activation_layer=nn.GELU,inplace=None),\
-                CusBlock(inChannels=outChannel,outChannel=hidenChannel),\
+                EDSConv(inChannels=outChannel,outChannel=hidenChannel),\
                 # DepthwiseConv2d(in_channels=outChannel,out_channels=hidenChannel,kernel_size=3,padding=1),
                 nn.BatchNorm2d(hidenChannel),\
                 nn.Conv2d(in_channels=hidenChannel,out_channels=outChannel,kernel_size=1,stride=1),\
@@ -240,18 +240,18 @@ class SemanticBranch(nn.Module):
         for c,r,e in zip(channels,repeat,expandRatio):
             if r > 1:
                 for j in range(r):
-                    l.append(GatherExpandBlock(inChannel=inChannels,outChannel=c,expansionFactor=e))
+                    l.append(LHPB(inChannel=inChannels,outChannel=c,expansionFactor=e))
                     inChannels = c
                 i += 1
             else:
-                l.append(GatherExpandBlock(inChannel=inChannels,outChannel=c,expansionFactor=e))
+                l.append(LHPB(inChannel=inChannels,outChannel=c,expansionFactor=e))
                 inChannels = c
                 i += 1
             if i % 2 == 0:
                 self.branch.append(nn.Sequential(*l))
                 l.clear()
         
-        self.branch.append(GatherExpandBlock(channels[-1],channels[-1],0))
+        self.branch.append(LHPB(channels[-1],channels[-1],0))
 
     def forward(self,x):
         fea = []

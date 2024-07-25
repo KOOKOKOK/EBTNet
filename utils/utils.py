@@ -13,7 +13,7 @@ from torch.utils.data import Dataset
         
 
 '''
-description: 按照固定随机种子划分数据集
+description: 
 param {Dataset} dataset
 param {List} ratios
 return {*}
